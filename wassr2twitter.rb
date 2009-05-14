@@ -90,6 +90,9 @@ id_file_name = '.wassr_id'
 #==================================
 statuses_hash = Hash::new
 
+proxy_scheme, proxy_host, proxy_port = 
+ENV['http_proxy'].scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
+
 #==================================
 # 実行
 #==================================
@@ -145,7 +148,7 @@ statuses_hash.sort{|a,b|
     req.basic_auth twitter_id,twitter_pw
     req.body = 'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
 
-    Net::HTTP.start(twitter_post_FQDN,twitter_http_port.to_i) {|http|
+    Net::HTTP::Proxy( proxy_host, proxy_port ).start(twitter_post_FQDN,twitter_http_port.to_i) {|http|
       res = http.request(req)
     }
     sleep 1

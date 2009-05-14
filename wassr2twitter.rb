@@ -114,13 +114,11 @@ for count in 1..wassr_get_pages do
   end
 end
 
-#ハッシュをソート
-statuses_hash.to_a.sort{|a,b|
- a[0] <=> b[0]
-}
-
-#投稿情報を作成
-statuses_hash.each_key {|key|
+#IDでソートしつつ投稿情報を作成
+statuses_hash.sort{|a,b|
+  a[0] <=> b[0]
+}.each {|key, value|
+  p key
   if id < key.to_i then
     id = key.to_i
     tmp_name = statuses_hash[key][xml_elem_post_name]
@@ -140,7 +138,6 @@ statuses_hash.each_key {|key|
     sleep 1
   end
 }
-
 
 #最終IDを書き込む
 tmp_file = open(id_file_name,'w')

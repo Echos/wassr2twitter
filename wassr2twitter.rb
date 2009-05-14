@@ -22,6 +22,19 @@ twitter_id = '<twitter id>'
 #twitter Password
 twitter_pw = '<twitter passwd>'
 
+# import ID/PW from ~/.pit
+begin
+  require 'rubygems'
+  require 'pit'
+  wassr = Pit::get( 'wassr' )
+  wassr_id = wassr['user']
+  wassr_pw = wassr['pass']
+  twitter = Pit::get( 'twitter_post' )
+  twitter_id = twitter['user']
+  twitter_pw = twitter['pass']
+rescue LoadError
+end
+
 http_port = '80'
 
 #==================================

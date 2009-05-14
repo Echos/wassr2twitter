@@ -97,7 +97,7 @@ id_file_name = '.wassr_id'
 statuses_hash = Hash::new
 
 proxy_scheme, proxy_host, proxy_port = 
-ENV['http_proxy'].scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
+(ENV['http_proxy']||'').scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
 
 #==================================
 # 実行

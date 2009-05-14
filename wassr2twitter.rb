@@ -18,9 +18,9 @@ wassr_pw   = '<wassr passwd>'
 wassr_get_pages = 1
 
 #twitter ID
-twitter_id = ',twitter id>'
+twitter_id = '<twitter id>'
 #twitter Password
-twitter_pw = 'twitter passwd'
+twitter_pw = '<twitter passwd>'
 
 http_port = '80'
 

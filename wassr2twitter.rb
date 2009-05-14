@@ -26,10 +26,16 @@ twitter_pw = '<twitter passwd>'
 begin
   require 'rubygems'
   require 'pit'
-  wassr = Pit::get( 'wassr' )
+  wassr = Pit::get( 'wassr', :require => {
+	 'user' => 'your ID of Wassr.',
+	 'pass' => 'your Password of Wassr.',
+  } )
   wassr_id = wassr['user']
   wassr_pw = wassr['pass']
-  twitter = Pit::get( 'twitter_post' )
+  twitter = Pit::get( 'twitter_post', :require => {  
+    'user' => 'your ID of Twitter.',
+    'pass' => 'your Password of Twitter.',
+  } )
   twitter_id = twitter['user']
   twitter_pw = twitter['pass']
 rescue LoadError

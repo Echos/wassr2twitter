@@ -52,10 +52,15 @@ rep_user_ids = ["Echos"]
 #==================================
 # 定数
 #==================================
+#wassr 投稿用情報
+wassr_post_FQDN = 'api.wassr.jp'
+wassr_post_URL  = '/statuses/update.json'
+wassr_http_port = '80'
+
 #wassr TLのXML取得
 wassr_apiUrl_for_TL = 'http://api.wassr.jp/statuses/friends_timeline.xml?'
-wassr_http_port = '80'
 wassr_apiParam_for_TL = 'page='
+
 
 #twitter 投稿用情報
 twitter_post_FQDN = 'twitter.com'
@@ -64,7 +69,8 @@ twitter_http_port = '80'
 
 #twitterのmention取得
 twitter_apiUrl_for_rep = 'http://twitter.com/statuses/mentions.xml?count=200&'
-twitter_apiParam_for_rep = 'sinse_id='
+twitter_apiParam_for_rep = 'since_id='
+
 
 #tinyurl api
 tinyurl_postUrl = 'http://tinyurl.com/api-create.php?url='
@@ -137,7 +143,8 @@ twitter_xml_elem_id = ['created_at',
 twitter_xml_root_id = 'statuses/status'
 
 #TwitterXMLの各発言要素ID
-twitter_xml_elem_key = wassr_xml_elem_id[1]
+twitter_xml_elem_key = twitter_xml_elem_id[1]
+twitter_xml_elem_post_name = twitter_xml_elem_id[11]
 twitter_xml_elem_post_text = twitter_xml_elem_id[2]
 
 #個々の使用する要素定義（for Twitter）
@@ -278,8 +285,39 @@ if twitter2wassr then
           twitter_xml_elem_key,
           twitter_xml_elem_id
           )
+  #IDでソートしつつ、投稿情報を作成
+  $statuses_hash.sort{ |a,b|
+    a[0] <=> b[0]
+  }.each { |key,value|
+    id = key.to_i
+
+    p tmp_name = $statuses_hash[key][twitter_xml_elem_post_name]
+    p tmp_text = $statuses_hash[key][twitter_xml_elem_post_text]
+    #指定のIDからのリプライだった場合、投稿する
+    if rep_user_ids.index(tmp_name) != nil  then
+      #余計な情報(@指定)を取り除く
+      p tmp_text = tmp_text.sub(/@.+\s/,"")
+
+      #投稿
+      Net::HTTP.version_1_2
+      req = Net::HTTP::Post.new(wassr_post_URL)
+      req.basic_auth wassr_id,wassr_pw
+      req.body = 'status=' + tmp_text
+
+      Net::HTTP::Proxy( proxy_host, proxy_port ).start(wassr_post_FQDN,wassr_http_port.to_i) {|http|
+        p res = http.request(req)
+      }
+      sleep 1
+
+    end
+  }
+  #最終IDを書き込む
+  write_last_id(id_file_name_twitter,id)
   
-  p $statuses_hash
+  #ハッシュをクリアする
+  $statuses_hash.clear
+
 end
+    
 
 exit

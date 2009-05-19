@@ -41,6 +41,8 @@ begin
 rescue LoadError
 end
 
+#wassrのタイムラインを監視するか？(trueでないと、このスクリプトの存在意義が…)
+wassr2twitter = true
 #Twitterのタイムラインを監視するか？
 twitter2wassr = true
 #Wassrに転送するリプライ元ユーザID
@@ -51,7 +53,7 @@ rep_user_ids = ["Echos"]
 # 定数
 #==================================
 #wassr TLのXML取得
-wassr_apiUrl_for_TL = 'http://api.wassr.jp/statuses/friends_timeline.xml'
+wassr_apiUrl_for_TL = 'http://api.wassr.jp/statuses/friends_timeline.xml?'
 wassr_http_port = '80'
 wassr_apiParam_for_TL = 'page='
 
@@ -61,7 +63,7 @@ twitter_post_URL  = '/statuses/update.xml'
 twitter_http_port = '80'
 
 #twitterのmention取得
-twitter_apiUrl_for_rep = 'http://twitter.com/statuses/mentions.xml'
+twitter_apiUrl_for_rep = 'http://twitter.com/statuses/mentions.xml?count=200&'
 twitter_apiParam_for_rep = 'sinse_id='
 
 #tinyurl api
@@ -99,7 +101,7 @@ wassr_xml_elem_post_link = wassr_xml_elem_id[7]
 wassr_xml_elem_post_rep  = wassr_xml_elem_id[4]
 
 #TwitterXML要素名（mentions用）
-twitter_xml_elem_id = ['create_at',
+twitter_xml_elem_id = ['created_at',
                        'id',
                        'text',
                        'source',
@@ -118,23 +120,24 @@ twitter_xml_elem_id = ['create_at',
                        'user/protected',
                        'user/followers_count',
                        'user/profile_background_color',
-                       'profile_text_color',
-                       'profile_link_color',
-                       'rofile_sidebar_fill_color',
-                       'rofile_sidebar_border_colopr',
-                       'riends_count',
-                       'reated_at',
-                       'avourites_count',
-                       'tc_offset',
-                       'ime_zone',
-                       'profile_background_image_url',
-                       'profile_background_tile',
-                       'statuses_count',
-                       'notifications',
-                       'following']
+                       'user/profile_text_color',
+                       'user/profile_link_color',
+                       'user/profile_sidebar_fill_color',
+                       'user/profile_sidebar_border_color',
+                       'user/friends_count',
+                       'user/created_at',
+                       'user/favourites_count',
+                       'user/utc_offset',
+                       'user/time_zone',
+                       'user/profile_background_image_url',
+                       'user/profile_background_tile',
+                       'user/statuses_count',
+                       'user/notifications',
+                       'user/following']
 twitter_xml_root_id = 'statuses/status'
 
 #TwitterXMLの各発言要素ID
+twitter_xml_elem_key = wassr_xml_elem_id[1]
 twitter_xml_elem_post_text = twitter_xml_elem_id[2]
 
 #個々の使用する要素定義（for Twitter）
@@ -152,9 +155,8 @@ proxy_scheme, proxy_host, proxy_port =
 (ENV['http_proxy']||'').scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
 
 #==================================
-# 実行
+# メソッド
 #==================================
-
 #各APIに接続して、情報を取得しハッシュに格納する。
 def get_xml(url,
             param_name,
@@ -164,8 +166,9 @@ def get_xml(url,
             xml_root,
             status_id_name,
             read_params)
-  result = open(url + '?' + param_name + param_valie, 
+  result = open(url + param_name + param_valie, 
                 :http_basic_authentication => [loginid, passwd]).read
+  
   xmldoc = REXML::Document.new(result)
 
   xmldoc.elements.each(xml_root) do |sts|
@@ -193,65 +196,91 @@ def read_last_id(file_name)
     id = tmp_file.gets.to_s.strip
     tmp_file.close
   rescue Errno::ENOENT
-    id = "0"
+    id = "1"
   end
 
   #数値文字列か評価し、おかしかったら0とする
   if id =~ /^[0-9]+$/ then
     id = id.to_i
   else
-    id = 0
+    id = 1
   end
 
   return id
 end
 
-#読込済みIDを取得する
-id = read_last_id(id_file_name_wassr)
+#==================================
+# 実行
+#==================================
 
-#BASIC認証を開始し、XMLオブジェクトを取得
-for count in 1..wassr_get_pages do
-  get_xml(
-          wassr_apiUrl_for_TL,
-          wassr_apiParam_for_TL,
-          count.to_s,
-          wassr_id,
-          wassr_pw,
-          wassr_xml_root_id,
-          wassr_xml_elem_key,
-          wassr_xml_elem_id
-          )
+if wassr2twitter then
+  #読込済みIDを取得する
+  id = read_last_id(id_file_name_wassr)
+
+  #BASIC認証を開始し、XMLオブジェクトを取得
+  for count in 1..wassr_get_pages do
+    get_xml(
+            wassr_apiUrl_for_TL,
+            wassr_apiParam_for_TL,
+            count.to_s,
+            wassr_id,
+            wassr_pw,
+            wassr_xml_root_id,
+            wassr_xml_elem_key,
+            wassr_xml_elem_id
+            )
+  end
+
+  #IDでソートしつつ投稿情報を作成
+  $statuses_hash.sort{|a,b|
+    a[0] <=> b[0]
+  }.each {|key, value|
+    p key
+    if id < key.to_i then
+      id = key.to_i
+      tmp_name = $statuses_hash[key][wassr_xml_elem_post_name]
+      tmp_text = $statuses_hash[key][wassr_xml_elem_post_text]
+      tmp_link = $statuses_hash[key][wassr_xml_elem_post_link]
+      tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
+
+      #投稿
+      Net::HTTP.version_1_2
+      req = Net::HTTP::Post.new(twitter_post_URL)
+      req.basic_auth twitter_id,twitter_pw
+      req.body = 'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
+
+      Net::HTTP::Proxy( proxy_host, proxy_port ).start(twitter_post_FQDN,twitter_http_port.to_i) {|http|
+        res = http.request(req)
+      }
+      sleep 1
+    end
+  }
+  
+  #最終IDを書き込む
+  write_last_id(id_file_name_wassr,id)
+  
+  #ハッシュをクリアする
+  $statuses_hash.clear
 end
 
-#IDでソートしつつ投稿情報を作成
-$statuses_hash.sort{|a,b|
-  a[0] <=> b[0]
-}.each {|key, value|
-  p key
-  if id < key.to_i then
-    id = key.to_i
-    tmp_name = $statuses_hash[key][wassr_xml_elem_post_name]
-    tmp_text = $statuses_hash[key][wassr_xml_elem_post_text]
-    tmp_link = $statuses_hash[key][wassr_xml_elem_post_link]
-    tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
-
-    #投稿
-    Net::HTTP.version_1_2
-    req = Net::HTTP::Post.new(twitter_post_URL)
-    req.basic_auth twitter_id,twitter_pw
-    req.body = 'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
-
-    Net::HTTP::Proxy( proxy_host, proxy_port ).start(twitter_post_FQDN,twitter_http_port.to_i) {|http|
-      res = http.request(req)
-    }
-    sleep 1
-  end
-}
-
-#最終IDを書き込む
-write_last_id(id_file_name_wassr,id)
-
-#ハッシュをクリアする
-$statuses_hash.clear
+#twitter の mentionsをチェック
+if twitter2wassr then 
+  #最終ID取得
+  id = read_last_id(id_file_name_twitter)
+  
+  #mention情報取得
+  get_xml(
+          twitter_apiUrl_for_rep,
+          twitter_apiParam_for_rep,
+          id.to_s,
+          twitter_id,
+          twitter_pw,
+          twitter_xml_root_id,
+          twitter_xml_elem_key,
+          twitter_xml_elem_id
+          )
+  
+  p $statuses_hash
+end
 
 exit

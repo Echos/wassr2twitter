@@ -23,6 +23,7 @@ twitter_id = '<twitter id>'
 twitter_pw = '<twitter passwd>'
 
 # import ID/PW from ~/.pit
+begin
   require 'rubygems'
   require 'pit'
   wassr = Pit::get( 'wassr', :require => {
@@ -37,6 +38,8 @@ twitter_pw = '<twitter passwd>'
   } )
   twitter_id = twitter['user']
   twitter_pw = twitter['pass']
+rescue LoadError
+end
 
 #Twitterのタイムラインを監視するか？
 twitter2wassr = true

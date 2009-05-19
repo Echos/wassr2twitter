@@ -235,7 +235,6 @@ if wassr2twitter then
   $statuses_hash.sort{|a,b|
     a[0] <=> b[0]
   }.each {|key, value|
-    p key
     if id < key.to_i then
       id = key.to_i
       tmp_name = $statuses_hash[key][wassr_xml_elem_post_name]

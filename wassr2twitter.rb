@@ -291,12 +291,12 @@ if twitter2wassr then
   }.each { |key,value|
     id = key.to_i
 
-    p tmp_name = $statuses_hash[key][twitter_xml_elem_post_name]
-    p tmp_text = $statuses_hash[key][twitter_xml_elem_post_text]
+    tmp_name = $statuses_hash[key][twitter_xml_elem_post_name]
+    tmp_text = $statuses_hash[key][twitter_xml_elem_post_text]
     #指定のIDからのリプライだった場合、投稿する
     if rep_user_ids.index(tmp_name) != nil  then
       #余計な情報(@指定)を取り除く
-      p tmp_text = tmp_text.sub(/@.+\s/,"")
+      tmp_text = tmp_text.sub(/@.+\s/,"")
 
       #投稿
       Net::HTTP.version_1_2
@@ -305,7 +305,7 @@ if twitter2wassr then
       req.body = 'status=' + tmp_text
 
       Net::HTTP::Proxy( proxy_host, proxy_port ).start(wassr_post_FQDN,wassr_http_port.to_i) {|http|
-        p res = http.request(req)
+        res = http.request(req)
       }
       sleep 1
 

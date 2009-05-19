@@ -38,7 +38,7 @@ begin
   } )
   twitter_id = twitter['user']
   twitter_pw = twitter['pass']
-rescue LoadError
+rescue LoadError
 end
 
 #Twitterのタイムラインを監視するか？
@@ -89,6 +89,7 @@ wassr_xml_elem_id = ['user_login_id',
                      'user/protected',
                      'user/profile_image_url',
                      'user/screen_name']
+wassr_xml_root_id = 'statuses/status'
 
 #個々の使用する要素定義（for Wassr）
 wassr_xml_elem_key = wassr_xml_elem_id[6]
@@ -131,9 +132,9 @@ twitter_xml_elem_id = ['create_at',
                        'statuses_count',
                        'notifications',
                        'following']
+twitter_xml_root_id = 'statuses/status'
 
 #TwitterXMLの各発言要素ID
-twitter_xml_root_id = 'statuses/status'
 twitter_xml_elem_post_text = twitter_xml_elem_id[2]
 
 #個々の使用する要素定義（for Twitter）
@@ -145,7 +146,7 @@ id_file_name_twitter = '.twitter_id'
 #==================================
 # 変数
 #==================================
-statuses_hash = Hash::new
+$statuses_hash = Hash::new
 
 proxy_scheme, proxy_host, proxy_port = 
 (ENV['http_proxy']||'').scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
@@ -153,50 +154,85 @@ proxy_scheme, proxy_host, proxy_port =
 #==================================
 # 実行
 #==================================
-#読込済みIDを取得する
-begin
-  tmp_file = open(id_file_name_wassr)
-  id = tmp_file.gets.to_s.strip
-  tmp_file.close
-rescue Errno::ENOENT
-  id = "0"
-end
 
-#数値文字列か評価し、おかしかったら0とする
-if id =~ /^[0-9]+$/ then
-  id = id.to_i
-else
-  id = 0
-end
-
-
-
-#BASIC認証を開始し、XMLオブジェクトを取得
-for count in 1..wassr_get_pages do
-  result = open(wassr_apiUrl_for_TL + '?' + wassr_apiParam_for_TL + count.to_s, 
-                :http_basic_authentication => [wassr_id, wassr_pw]).read
+#各APIに接続して、情報を取得しハッシュに格納する。
+def get_xml(url,
+            param_name,
+            param_valie,
+            loginid,
+            passwd,
+            xml_root,
+            status_id_name,
+            read_params)
+  result = open(url + '?' + param_name + param_valie, 
+                :http_basic_authentication => [loginid, passwd]).read
   xmldoc = REXML::Document.new(result)
 
-  xmldoc.elements.each('statuses/status') do |sts|
+  xmldoc.elements.each(xml_root) do |sts|
     #連想配列に格納後、IDをキーに連想配列に格納
     tmpHash = Hash::new
-    wassr_xml_elem_id.each do |elm|
+    read_params.each do |elm|
       tmpHash[elm] = sts.elements[elm].text.to_s
     end
-    statuses_hash[tmpHash[wassr_xml_elem_key]]=tmpHash
+    $statuses_hash[tmpHash[status_id_name]]=tmpHash
   end
 end
 
+#最終取得IDを指定ファイルに格納する。
+def write_last_id(file_name,id)
+  tmp_file = open(file_name,'w')
+  tmp_file.puts id
+  tmp_file.close
+end
+
+#最終取得IDを指定ファイルから読み出す
+#失敗した場合は0が返される
+def read_last_id(file_name)
+  begin
+    tmp_file = open(file_name)
+    id = tmp_file.gets.to_s.strip
+    tmp_file.close
+  rescue Errno::ENOENT
+    id = "0"
+  end
+
+  #数値文字列か評価し、おかしかったら0とする
+  if id =~ /^[0-9]+$/ then
+    id = id.to_i
+  else
+    id = 0
+  end
+
+  return id
+end
+
+#読込済みIDを取得する
+id = read_last_id(id_file_name_wassr)
+
+#BASIC認証を開始し、XMLオブジェクトを取得
+for count in 1..wassr_get_pages do
+  get_xml(
+          wassr_apiUrl_for_TL,
+          wassr_apiParam_for_TL,
+          count.to_s,
+          wassr_id,
+          wassr_pw,
+          wassr_xml_root_id,
+          wassr_xml_elem_key,
+          wassr_xml_elem_id
+          )
+end
+
 #IDでソートしつつ投稿情報を作成
-statuses_hash.sort{|a,b|
+$statuses_hash.sort{|a,b|
   a[0] <=> b[0]
 }.each {|key, value|
   p key
   if id < key.to_i then
     id = key.to_i
-    tmp_name = statuses_hash[key][wassr_xml_elem_post_name]
-    tmp_text = statuses_hash[key][wassr_xml_elem_post_text]
-    tmp_link = statuses_hash[key][wassr_xml_elem_post_link]
+    tmp_name = $statuses_hash[key][wassr_xml_elem_post_name]
+    tmp_text = $statuses_hash[key][wassr_xml_elem_post_text]
+    tmp_link = $statuses_hash[key][wassr_xml_elem_post_link]
     tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
 
     #投稿
@@ -213,8 +249,9 @@ statuses_hash.sort{|a,b|
 }
 
 #最終IDを書き込む
-tmp_file = open(id_file_name_wassr,'w')
-tmp_file.puts id
-tmp_file.close
+write_last_id(id_file_name_wassr,id)
+
+#ハッシュをクリアする
+$statuses_hash.clear
 
 exit

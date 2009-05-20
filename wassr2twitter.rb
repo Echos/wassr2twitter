@@ -42,7 +42,7 @@ rescue LoadError
 end
 
 #wassrのタイムラインを監視するか？(trueでないと、このスクリプトの存在意義が…)
-wassr2twitter = true
+wassr2twitter = false
 #Twitterのタイムラインを監視するか？
 twitter2wassr = true
 #Wassrに転送するリプライ元ユーザID
@@ -302,7 +302,7 @@ if twitter2wassr then
       Net::HTTP.version_1_2
       req = Net::HTTP::Post.new(wassr_post_URL)
       req.basic_auth wassr_id,wassr_pw
-      req.body = 'status=' + tmp_text
+      req.body = 'source=wassr2twitter&status=' + tmp_text
 
       Net::HTTP::Proxy( proxy_host, proxy_port ).start(wassr_post_FQDN,wassr_http_port.to_i) {|http|
         res = http.request(req)

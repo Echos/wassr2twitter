@@ -263,6 +263,11 @@ begin
          'TwitterのMentionsをWassrに投稿する true:有効 false:無効 （Default:false）') {
     |v| opt_hash[:t] = v }
 
+  opt.on('-A IDs',
+         '--target-account=IDs' ,
+         'TwitterのMentionsからWassrに投稿すべきTwitterアカウントを記述する。カンマ区切りで複数指定可能') {
+    |v| opt_hash[:A] = v }
+  
   #オプションのパース
   opt.parse!(ARGV)
   
@@ -272,7 +277,6 @@ rescue
   exit
 end
 
-p opt_hash
 #各引数の判定処理
 begin
   opt_hash.each { |arg , value| 
@@ -295,7 +299,7 @@ begin
         twitter2wassr = false
       else
         raise ArgumentError, "invalid argument"
-  end
+      end
     when :n
       if chk_num(value) then
         wassr_get_pages = value.to_i
@@ -305,6 +309,10 @@ begin
       else
         raise ArgumentError, "invalid argument"
       end
+    when :A
+      #カンマ区切りを配列に
+      #重複を除去
+      rep_user_ids = value.split(',').uniq
     end
   }
   
@@ -313,7 +321,6 @@ rescue
   exit
 end
 
-exit
 #==================================
 # 実行
 #==================================

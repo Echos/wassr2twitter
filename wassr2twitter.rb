@@ -245,10 +245,10 @@ opt_hash = Hash::new
 
 begin 
   #コマンドラインオプション定義
-  opt.on('-h','--help','USAGEを表示')    {|v| puts opt.help;exit }
+  opt.on('-h','--help','USAGEを表示。')    {|v| puts opt.help;exit }
 
   opt.on('-n page',
-         'Wassrのタイムラインを取得するページ数（Default:1 Min:' << 
+         'Wassrのタイムラインを取得するページ数。（Default:1 Min:' << 
          wassr_get_pages_min.to_s << ' Max:' << 
          wassr_get_pages_max.to_s << '）')    {
     |v| opt_hash[:n] = v } 
@@ -260,12 +260,12 @@ begin
 
   opt.on('-t bool',
          '--twitter2wassr=bool' ,
-         'TwitterのMentionsをWassrに投稿する true:有効 false:無効 （Default:false）') {
+         'TwitterのMentionsをWassrに投稿する。 true:有効 false:無効 （Default:false）') {
     |v| opt_hash[:t] = v }
 
   opt.on('-A IDs',
          '--target-account=IDs' ,
-         'TwitterのMentionsからWassrに投稿すべきTwitterアカウントを記述する。カンマ区切りで複数指定可能') {
+         'TwitterのMentionsからWassrに投稿すべきTwitterアカウントを記述する。カンマ区切りで複数指定可能。') {
     |v| opt_hash[:A] = v }
   
   #オプションのパース
@@ -276,6 +276,7 @@ rescue
   puts opt.help
   exit
 end
+
 
 #各引数の判定処理
 begin

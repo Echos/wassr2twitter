@@ -6,6 +6,7 @@ require 'uri'
 require 'open-uri'
 require "net/http"
 require "rexml/document"
+require 'optparse'
 
 #==================================
 # 初期設定
@@ -14,8 +15,6 @@ require "rexml/document"
 wassr_id   = '<wassr id>'
 #wassr Passwd
 wassr_pw   = '<wassr passwd>'
-#取得ページ数
-wassr_get_pages = 1
 
 #twitter ID
 twitter_id = '<twitter id>'
@@ -41,17 +40,16 @@ begin
 rescue LoadError
 end
 
-#wassrのタイムラインを監視するか？(trueでないと、このスクリプトの存在意義が…)
-wassr2twitter = false
-#Twitterのタイムラインを監視するか？
-twitter2wassr = true
-#Wassrに転送するリプライ元ユーザID
-rep_user_ids = ["Echos"]
-
 
 #==================================
 # 定数
 #==================================
+#wassrページの取得数MIN,MAX
+#※本アプリとしての制約
+wassr_get_pages_min = 1
+wassr_get_pages_max = 5
+
+
 #wassr 投稿用情報
 wassr_post_FQDN = 'api.wassr.jp'
 wassr_post_URL  = '/statuses/update.json'
@@ -156,6 +154,18 @@ id_file_name_twitter = '.twitter_id'
 #==================================
 # 変数
 #==================================
+#wassrのタイムラインを監視するか？(trueでないと、このスクリプトの存在意義が…)
+wassr2twitter = true
+
+#Twitterのタイムラインを監視するか？
+twitter2wassr = false
+
+#Wassrに転送するリプライ元ユーザID
+rep_user_ids = Array::new
+
+#Wassrタイムライン取得ページ数
+wassr_get_pages = 1
+
 $statuses_hash = Hash::new
 
 proxy_scheme, proxy_host, proxy_port = 
@@ -216,6 +226,94 @@ def read_last_id(file_name)
   return id
 end
 
+#文字列が数字のみで構成されているか確認
+def chk_num(str)
+  if str=~/^[0-9]+$/ then
+    return true
+  else
+    return false
+  end
+end
+
+#==================================
+# コマンドラインオプション
+#==================================
+opt = OptionParser.new
+
+#オプション情報保持用
+opt_hash = Hash::new
+
+begin 
+  #コマンドラインオプション定義
+  opt.on('-h','--help','USAGEを表示')    {|v| puts opt.help;exit }
+
+  opt.on('-n page',
+         'Wassrのタイムラインを取得するページ数（Default:1 Min:' << 
+         wassr_get_pages_min.to_s << ' Max:' << 
+         wassr_get_pages_max.to_s << '）')    {
+    |v| opt_hash[:n] = v } 
+  
+  opt.on('-w bool',
+         '--wassr2twitter=bool' ,
+         'WassrのタイムラインをTiwtterに投稿する。 true:有効 false:無効 （Default:true）') {
+    |v| opt_hash[:w] = v }
+
+  opt.on('-t bool',
+         '--twitter2wassr=bool' ,
+         'TwitterのMentionsをWassrに投稿する true:有効 false:無効 （Default:false）') {
+    |v| opt_hash[:t] = v }
+
+  #オプションのパース
+  opt.parse!(ARGV)
+  
+rescue
+  #指定外のオプションが存在する場合はUsageを表示
+  puts opt.help
+  exit
+end
+
+p opt_hash
+#各引数の判定処理
+begin
+  opt_hash.each { |arg , value| 
+    case arg
+    when :w
+        case value
+        when 'true'
+          wassr2twitter = true
+        when 'false'
+          wassr2twitter = false
+        else
+          raise ArgumentError, "invalid argument"
+        end
+
+    when :t
+      case opt_hash[:t]
+      when 'true'
+        twitter2wassr = true
+      when 'false'
+        twitter2wassr = false
+      else
+        raise ArgumentError, "invalid argument"
+  end
+    when :n
+      if chk_num(value) then
+        wassr_get_pages = value.to_i
+        if wassr_get_pages < wassr_get_pages_min or wassr_get_pages > wassr_get_pages_max then 
+          raise ArgumentError, "invalid argument"
+        end
+      else
+        raise ArgumentError, "invalid argument"
+      end
+    end
+  }
+  
+rescue
+  puts opt.help
+  exit
+end
+
+exit
 #==================================
 # 実行
 #==================================

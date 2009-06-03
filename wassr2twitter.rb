@@ -168,7 +168,7 @@ wassr_get_pages = 1
 
 $statuses_hash = Hash::new
 
-proxy_scheme, proxy_host, proxy_port = 
+$proxy_scheme, $proxy_host, $proxy_port = 
 (ENV['http_proxy']||'').scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
 
 #==================================
@@ -197,6 +197,28 @@ def get_xml(url,
     $statuses_hash[tmpHash[status_id_name]]=tmpHash
   end
 end
+
+#投稿用の共通処理
+def post_entry(host,
+               port,
+               path,
+               id,
+               pass,
+               body)
+      #投稿
+      Net::HTTP.version_1_2
+      req = Net::HTTP::Post.new(path)
+      req.basic_auth id,pass
+
+      req.body = body
+
+      Net::HTTP::Proxy( $proxy_host, $proxy_port ).start(host,port) {|http|
+        res = http.request(req)
+      }
+      #連投用の待機
+      sleep 1
+end
+
 
 #最終取得IDを指定ファイルに格納する。
 def write_last_id(file_name,id)
@@ -356,15 +378,13 @@ if wassr2twitter then
       tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
 
       #投稿
-      Net::HTTP.version_1_2
-      req = Net::HTTP::Post.new(twitter_post_URL)
-      req.basic_auth twitter_id,twitter_pw
-      req.body = 'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
-
-      Net::HTTP::Proxy( proxy_host, proxy_port ).start(twitter_post_FQDN,twitter_http_port.to_i) {|http|
-        res = http.request(req)
-      }
-      sleep 1
+      post_entry(twitter_post_FQDN,
+                 twitter_http_port.to_i,
+                 twitter_post_URL,
+                 twitter_id,
+                 twitter_pw,
+                 'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
+                 )
     end
   }
   
@@ -404,17 +424,15 @@ if twitter2wassr then
       #余計な情報(@指定)を取り除く
       tmp_text = tmp_text.sub(/@.+\s/,"")
 
-      #投稿
-      Net::HTTP.version_1_2
-      req = Net::HTTP::Post.new(wassr_post_URL)
-      req.basic_auth wassr_id,wassr_pw
-      req.body = 'source=wassr2twitter&status=' + tmp_text
 
-      Net::HTTP::Proxy( proxy_host, proxy_port ).start(wassr_post_FQDN,wassr_http_port.to_i) {|http|
-        res = http.request(req)
-      }
-      sleep 1
-
+      post_entry(wassr_post_FQDN,
+                 wassr_http_port.to_i,
+                 wassr_post_URL,
+                 wassr_id,
+                 wassr_pw,
+                 'source=wassr2twitter&status=' + tmp_text
+                 )
+      
     end
   }
   #最終IDを書き込む

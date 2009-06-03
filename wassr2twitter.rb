@@ -7,6 +7,7 @@ require 'open-uri'
 require "net/http"
 require "rexml/document"
 require 'optparse'
+require 'timeout'
 
 #==================================
 # 初期設定
@@ -171,6 +172,9 @@ $statuses_hash = Hash::new
 $proxy_scheme, $proxy_host, $proxy_port = 
 (ENV['http_proxy']||'').scan( %r|^(.*?)://(.*?):(\d+)?| ).flatten
 
+#HTTP接続のタイムアウト時刻
+$req_timeout = 10
+
 #==================================
 # メソッド
 #==================================
@@ -183,19 +187,28 @@ def get_xml(url,
             xml_root,
             status_id_name,
             read_params)
-  result = open(url + param_name + param_valie, 
-                :http_basic_authentication => [loginid, passwd]).read
-  
-  xmldoc = REXML::Document.new(result)
 
-  xmldoc.elements.each(xml_root) do |sts|
-    #連想配列に格納後、IDをキーに連想配列に格納
-    tmpHash = Hash::new
-    read_params.each do |elm|
-      tmpHash[elm] = sts.elements[elm].text.to_s
-    end
-    $statuses_hash[tmpHash[status_id_name]]=tmpHash
+  begin
+    timeout($req_timeout){ 
+      result = open(url + param_name + param_valie, 
+                    :http_basic_authentication => [loginid, passwd]).read
+      
+      xmldoc = REXML::Document.new(result)
+      
+      xmldoc.elements.each(xml_root) do |sts|
+        #連想配列に格納後、IDをキーに連想配列に格納
+        tmpHash = Hash::new
+        read_params.each do |elm|
+          tmpHash[elm] = sts.elements[elm].text.to_s
+        end
+      $statuses_hash[tmpHash[status_id_name]]=tmpHash
+      end
+    }
+  rescue Timeout::Error
+    #タイムアウトでスクリプト終了
+    exit 0;
   end
+  
 end
 
 #投稿用の共通処理
@@ -205,18 +218,25 @@ def post_entry(host,
                id,
                pass,
                body)
+  begin
+    timeout($req_timeout){
       #投稿
       Net::HTTP.version_1_2
       req = Net::HTTP::Post.new(path)
       req.basic_auth id,pass
-
+      
       req.body = body
-
+      
       Net::HTTP::Proxy( $proxy_host, $proxy_port ).start(host,port) {|http|
         res = http.request(req)
       }
       #連投用の待機
       sleep 1
+    }
+  rescue Timeout::Error
+    #タイムアウトでスクリプト終了
+    exit 0;
+  end
 end
 
 

@@ -206,7 +206,11 @@ def get_xml(url,
     }
   rescue Timeout::Error
     #タイムアウトでスクリプト終了
-    exit 0;
+    exit 0
+  rescue Errno::ECONNRESET
+    exit 0
+  rescue
+    exit 0
   end
   
 end
@@ -235,8 +239,13 @@ def post_entry(host,
     }
   rescue Timeout::Error
     #タイムアウトでスクリプト終了
-    exit 0;
+    exit 0
+  rescue Errno::ECONNRESET
+    exit 0
+  rescue
+    exit 0
   end
+  
 end
 
 

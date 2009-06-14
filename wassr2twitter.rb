@@ -404,7 +404,7 @@ if wassr2twitter then
       tmp_name = $statuses_hash[key][wassr_xml_elem_post_name]
       tmp_text = $statuses_hash[key][wassr_xml_elem_post_text]
       tmp_link = $statuses_hash[key][wassr_xml_elem_post_link]
-      tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
+      #tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
 
       #投稿
       post_entry(twitter_post_FQDN,

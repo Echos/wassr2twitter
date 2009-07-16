@@ -27,17 +27,27 @@ begin
   require 'rubygems'
   require 'pit'
   wassr = Pit::get( 'wassr', :require => {
-	 'user' => 'your ID of Wassr.',
-	 'pass' => 'your Password of Wassr.',
+                      'user' => 'your ID of Wassr.',
+                      'pass' => 'your Password of Wassr.',
   } )
   wassr_id = wassr['user']
   wassr_pw = wassr['pass']
   twitter = Pit::get( 'twitter_post', :require => {  
-    'user' => 'your ID of Twitter.',
-    'pass' => 'your Password of Twitter.',
+                        'user' => 'your ID of Twitter.',
+                        'pass' => 'your Password of Twitter.',
   } )
   twitter_id = twitter['user']
   twitter_pw = twitter['pass']
+  begin
+    require 'prowl'
+    prowl = Pit::get( 'prowl', :require => { 
+                        'apikey' => 'your Prowl API Key',
+                      })
+    prowl_api = prowl['apikey']
+    prl = Prowl.new(prowl_api)
+  rescue LoadError
+  end
+
 rescue LoadError
 end
 
@@ -160,6 +170,9 @@ wassr2twitter = true
 
 #Twitterのタイムラインを監視するか？
 twitter2wassr = false
+
+#prowl利用
+useProwl = false
 
 #Wassrに転送するリプライ元ユーザID
 rep_user_ids = Array::new
@@ -318,6 +331,11 @@ begin
          '--target-account=IDs' ,
          'TwitterのMentionsからWassrに投稿すべきTwitterアカウントを記述する。カンマ区切りで複数指定可能。') {
     |v| opt_hash[:A] = v }
+
+  opt.on('-p Use Prowl',
+         '--use-prowl' ,
+         'Wassrの投稿をProwlに通知') {
+    |v| opt_hash[:p] = v }
   
   #オプションのパース
   opt.parse!(ARGV)
@@ -365,6 +383,8 @@ begin
       #カンマ区切りを配列に
       #重複を除去
       rep_user_ids = value.split(',').uniq
+    when :p
+      useProwl = true
     end
   }
   
@@ -414,6 +434,18 @@ if wassr2twitter then
                  twitter_pw,
                  'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
                  )
+      #Prowlに通知
+      begin
+        if useProwl  then
+          prl.send(
+                   :application => "wassr2twitter",
+                   :event => tmp_name,
+                   :description => tmp_text
+                   )
+        end
+
+      rescue
+      end
     end
   }
   

@@ -332,7 +332,7 @@ begin
          'TwitterのMentionsからWassrに投稿すべきTwitterアカウントを記述する。カンマ区切りで複数指定可能。') {
     |v| opt_hash[:A] = v }
 
-  opt.on('-p Use Prowl',
+  opt.on('-p',
          '--use-prowl' ,
          'Wassrの投稿をProwlに通知') {
     |v| opt_hash[:p] = v }

@@ -447,7 +447,7 @@ if wassr2twitter then
   }
   #Prowlに通知
   begin
-    if useProwl && $prl_num.length != 0  then
+    if useProwl && $prl_num != 0  then
       prl.send(
                :application => "wassr2twitter",
                :event => $prl_num.to_s + '件のメッセージ',

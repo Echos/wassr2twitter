@@ -188,6 +188,9 @@ $proxy_scheme, $proxy_host, $proxy_port =
 #HTTP接続のタイムアウト時刻
 $req_timeout = 10
 
+#Prowl用メッセージ
+$prl_message = ''
+
 #==================================
 # メソッド
 #==================================
@@ -424,6 +427,9 @@ if wassr2twitter then
       tmp_name = $statuses_hash[key][wassr_xml_elem_post_name]
       tmp_text = $statuses_hash[key][wassr_xml_elem_post_text]
       tmp_link = $statuses_hash[key][wassr_xml_elem_post_link]
+      #Prowl用メッセージ文を作成
+      #最終メッセージのみを送信する
+      $prl_message = tmp_name + ':' + tmp_text
       #tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
 
       #投稿
@@ -434,20 +440,21 @@ if wassr2twitter then
                  twitter_pw,
                  'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
                  )
-      #Prowlに通知
-      begin
-        if useProwl  then
-          prl.send(
-                   :application => "wassr2twitter",
-                   :event => tmp_name,
-                   :description => tmp_text
-                   )
-        end
-
-      rescue
-      end
     end
   }
+  #Prowlに通知
+  begin
+    if useProwl && $statuses_hash.length != 0  then
+      prl.send(
+               :application => "wassr2twitter",
+               :event => $statuses_hash.length.to_s + '件のメッセージ',
+               :description => $prl_message
+               )
+    end
+    
+  rescue
+  end
+  
   
   #最終IDを書き込む
   write_last_id(id_file_name_wassr,id)

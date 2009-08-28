@@ -190,6 +190,7 @@ $req_timeout = 10
 
 #Prowl用メッセージ
 $prl_message = ''
+$prl_num = 0
 
 #==================================
 # メソッド
@@ -430,6 +431,8 @@ if wassr2twitter then
       #Prowl用メッセージ文を作成
       #最終メッセージのみを送信する
       $prl_message = tmp_name + ':' + tmp_text
+      $prl_num = $prl_num + 1
+      
       #tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
 
       #投稿
@@ -444,10 +447,10 @@ if wassr2twitter then
   }
   #Prowlに通知
   begin
-    if useProwl && $statuses_hash.length != 0  then
+    if useProwl && $prl_num.length != 0  then
       prl.send(
                :application => "wassr2twitter",
-               :event => $statuses_hash.length.to_s + '件のメッセージ',
+               :event => $prl_num.to_s + '件のメッセージ',
                :description => $prl_message
                )
     end

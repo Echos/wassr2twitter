@@ -12,6 +12,16 @@ require 'timeout'
 #==================================
 # 初期設定
 #==================================
+#Oauth設定
+#以下のサイトにて、お手数ですが、アプリケーション登録をお願いします。
+#Twitter / Applications http://twitter.com/oauth_clients
+# 設定では以下のようにしてください
+# [Application Name]    : 文字列にTwitterを含まない任意の名前
+# [Application Type]    : "Client"
+# [Default Access type] : "Read & Write"
+consumer_key = '<CONSUMER-KEY>'
+consumer_secret = '<CONSUMER-SECRET>'
+
 #wassr ID
 wassr_id   = '<wassr id>'
 #wassr Passwd
@@ -26,6 +36,7 @@ twitter_pw = '<twitter passwd>'
 begin
   require 'rubygems'
   require 'pit'
+
   wassr = Pit::get( 'wassr', :require => {
                       'user' => 'your ID of Wassr.',
                       'pass' => 'your Password of Wassr.',
@@ -38,6 +49,18 @@ begin
   } )
   twitter_id = twitter['user']
   twitter_pw = twitter['pass']
+
+  oauth_key = Pit::get( 'oauth_consumer_info', :require => {  
+                        'key' => 'your Consumer key for OAuth.',
+                        'secret' => 'your Consumer secret for OAuth',
+  } )
+  begin 
+      require 'oauth'
+      consumer_key = oauth_key['key']
+      consumer_secret = oauth_key['secret']
+  rescue LoadError
+  end 
+
   begin
     require 'prowl'
     prowl = Pit::get( 'prowl', :require => { 
@@ -47,10 +70,8 @@ begin
     prl = Prowl.new(prowl_api)
   rescue LoadError
   end
-
 rescue LoadError
 end
-
 
 #==================================
 # 定数
@@ -72,14 +93,19 @@ wassr_apiParam_for_TL = 'page='
 
 
 #twitter 投稿用情報
-twitter_post_FQDN = 'twitter.com'
-twitter_post_URL  = '/statuses/update.xml'
-twitter_http_port = '80'
+#twitter_post_FQDN = 'twitter.com'
+#twitter_post_URL  = '/statuses/update.xml'
+#twitter_http_port = '80'
+
+twitter_post = 'http://twitter.com/statuses/update.xml'
+
+#twitter access token
+twitter_api_for_token = 'https://api.twitter.com'
 
 #twitterのmention取得
-twitter_apiUrl_for_rep = 'http://twitter.com/statuses/mentions.xml?count=200&'
-twitter_apiParam_for_rep = 'since_id='
-
+twitter_get_mentions = 'http://twitter.com/statuses/mentions.xml?count=200&since_id='
+#twitter_apiUrl_for_rep = 'http://twitter.com/statuses/mentions.xml?count=200&'
+#twitter_apiParam_for_rep = 'since_id='
 
 #tinyurl api
 tinyurl_postUrl = 'http://tinyurl.com/api-create.php?url='
@@ -162,6 +188,9 @@ twitter_xml_elem_post_text = twitter_xml_elem_id[2]
 id_file_name_wassr = '.wassr_id'
 id_file_name_twitter = '.twitter_id'
 
+#リクエストトークン情報保存ファイル
+$req_token_file_name = '.token_info'
+
 #==================================
 # 変数
 #==================================
@@ -192,6 +221,10 @@ $req_timeout = 10
 $prl_message = ''
 $prl_num = 0
 
+#アクセストークン
+$access_token_token  = '';
+$access_token_secret = '';
+
 #==================================
 # メソッド
 #==================================
@@ -210,16 +243,8 @@ def get_xml(url,
       result = open(url + param_name + param_valie, 
                     :http_basic_authentication => [loginid, passwd]).read
       
-      xmldoc = REXML::Document.new(result)
-      
-      xmldoc.elements.each(xml_root) do |sts|
-        #連想配列に格納後、IDをキーに連想配列に格納
-        tmpHash = Hash::new
-        read_params.each do |elm|
-          tmpHash[elm] = sts.elements[elm].text.to_s
-        end
-      $statuses_hash[tmpHash[status_id_name]]=tmpHash
-      end
+      get_xml_value(result,xml_root,status_id_name,read_params)
+
     }
   rescue Timeout::Error
     #タイムアウトでスクリプト終了
@@ -229,7 +254,32 @@ def get_xml(url,
   rescue
     exit 0
   end
-  
+end
+
+def get_xml_value(response,
+            xml_root,
+            status_id_name,
+            read_params)
+
+  begin
+      xmldoc = REXML::Document.new(response)
+      
+      xmldoc.elements.each(xml_root) do |sts|
+        #連想配列に格納後、IDをキーに連想配列に格納
+        tmpHash = Hash::new
+        read_params.each do |elm|
+          tmpHash[elm] = sts.elements[elm].text.to_s
+        end
+      $statuses_hash[tmpHash[status_id_name]]=tmpHash
+      end
+  rescue Timeout::Error
+    #タイムアウトでスクリプト終了
+    exit 0
+  rescue Errno::ECONNRESET
+    exit 0
+  rescue
+    exit 0
+  end
 end
 
 #投稿用の共通処理
@@ -273,6 +323,13 @@ def write_last_id(file_name,id)
   tmp_file.close
 end
 
+#リクエストークン情報を格納する。
+def write_token_info()
+  tmp_file = open($req_token_file_name,'w')
+  tmp_file.puts $access_token_token + ',' + $access_token_secret
+  tmp_file.close
+end
+
 #最終取得IDを指定ファイルから読み出す
 #失敗した場合は0が返される
 def read_last_id(file_name)
@@ -292,6 +349,21 @@ def read_last_id(file_name)
   end
 
   return id
+end
+
+#トークン情報を読み出す
+def read_token_info()
+  begin
+    tmp_file = open($req_token_file_name)
+    tokens = tmp_file.gets.to_s.strip.split(',')
+    $access_token_token  = tokens[0]
+    $access_token_secret = tokens[1]
+    tmp_file.close
+  rescue Errno::ENOENT
+    token = ''
+  end
+
+  return token
 end
 
 #文字列が数字のみで構成されているか確認
@@ -348,6 +420,48 @@ rescue
   #指定外のオプションが存在する場合はUsageを表示
   puts opt.help
   exit
+end
+
+
+#アクセストークンが既存か確認
+
+
+#Access_tokenを取得する。
+oauth_consumer = OAuth::Consumer.new(
+                                     consumer_key,
+                                     consumer_secret,
+                                     :site => twitter_api_for_token)
+
+#リクエストトークンを取得
+read_token_info
+
+if($access_token_token == '')then
+  begin
+    access_token = oauth_consumer.get_access_token(
+                                                   nil,
+                                                   {},
+                                                   {:x_auth_mode => "client_auth",
+                                                     :x_auth_username => twitter_id,
+                                                     :x_auth_password => twitter_pw,})
+  #リクエストトークン情報
+  $access_token_token = access_token.token
+  $access_token_secret = access_token.secret
+  #ファイルに書き出し
+  write_token_info
+  rescue
+    puts 'アクセストークンを取得出きませんでした。'
+    puts 'リクエストトークンを再取得していただくと問題が解決するかもしれません。'
+    exit
+  end
+else
+  #既存情報でアクセストークン作成
+  access_token = OAuth::AccessToken.new(
+                                        oauth_consumer,
+                                        $access_token_token,
+                                        $access_token_secret
+)
+
+
 end
 
 
@@ -436,13 +550,17 @@ if wassr2twitter then
       #tmp_link = open(tinyurl_postUrl + tmp_link.to_s).read.to_s
 
       #投稿
-      post_entry(twitter_post_FQDN,
-                 twitter_http_port.to_i,
-                 twitter_post_URL,
-                 twitter_id,
-                 twitter_pw,
-                 'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
-                 )
+      #既存のBacis認証部分
+      #post_entry(twitter_post_FQDN,
+      #           twitter_http_port.to_i,
+      #           twitter_post_URL,
+      #           twitter_id,
+      #           twitter_pw,
+      #           'status=' + URI.encode("[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]")
+      #           )
+      
+      #Oauthで投稿
+      access_token.post(twitter_post,{:status => "[ws]" + tmp_name + ":" + tmp_text + "[" + tmp_link+"]"})
     end
   }
   #Prowlに通知
@@ -472,15 +590,12 @@ if twitter2wassr then
   id = read_last_id(id_file_name_twitter)
   
   #mention情報取得
-  get_xml(
-          twitter_apiUrl_for_rep,
-          twitter_apiParam_for_rep,
-          id.to_s,
-          twitter_id,
-          twitter_pw,
-          twitter_xml_root_id,
-          twitter_xml_elem_key,
-          twitter_xml_elem_id
+  response = access_token.get(twitter_get_mentions + id.to_s)
+  get_xml_value(
+                response.body,
+                twitter_xml_root_id,
+                twitter_xml_elem_key,
+                twitter_xml_elem_id
           )
   #IDでソートしつつ、投稿情報を作成
   $statuses_hash.sort{ |a,b|
